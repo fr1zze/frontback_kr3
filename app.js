@@ -1,16 +1,50 @@
-const form = document.getElementById('note-form')
-const input = document.getElementById('note-input')
-const notesList = document.getElementById('notes-list')
-const notesCount = document.getElementById('notes-count')
-const emptyState = document.getElementById('empty-state')
-const submitBtn = document.getElementById('submit-btn')
-const cancelEditBtn = document.getElementById('cancel-edit-btn')
-const clearAllBtn = document.getElementById('clear-all-btn')
+const contentDiv = document.getElementById('app-content')
+const homeBtn = document.getElementById('home-btn')
+const aboutBtn = document.getElementById('about-btn')
 const networkStatus = document.getElementById('network-status')
+const enablePushBtn = document.getElementById('enable-push')
+const disablePushBtn = document.getElementById('disable-push')
 const installBtn = document.getElementById('install-btn')
+
+const socket = typeof io !== 'undefined' ? io() : null
 
 let editingId = null
 let deferredPrompt = null
+let currentRegistration = null
+
+function setActiveButton(activeId) {
+  ;[homeBtn, aboutBtn].forEach(btn => btn.classList.remove('active'))
+  document.getElementById(activeId).classList.add('active')
+}
+
+async function loadContent(page) {
+  try {
+    const response = await fetch(`./content/${page}.html`)
+    const html = await response.text()
+    contentDiv.innerHTML = html
+
+    if (page === 'home') {
+      initNotes()
+    }
+  } catch (err) {
+    contentDiv.innerHTML = `
+      <div class="empty">
+        Ошибка загрузки страницы.
+      </div>
+    `
+    console.error(err)
+  }
+}
+
+homeBtn.addEventListener('click', () => {
+  setActiveButton('home-btn')
+  loadContent('home')
+})
+
+aboutBtn.addEventListener('click', () => {
+  setActiveButton('about-btn')
+  loadContent('about')
+})
 
 function getNotes() {
   return JSON.parse(localStorage.getItem('notes') || '[]')
@@ -24,106 +58,10 @@ function formatDate(value) {
   return new Date(value).toLocaleString('ru-RU')
 }
 
-function updateCounters(notes) {
-  notesCount.textContent = `Заметок: ${notes.length}`
-  emptyState.classList.toggle('hidden', notes.length !== 0)
-}
-
 function escapeHtml(text) {
   const div = document.createElement('div')
   div.textContent = text
   return div.innerHTML
-}
-
-function renderNotes() {
-  const notes = getNotes()
-
-  if (notes.length === 0) {
-    notesList.innerHTML = ''
-    updateCounters(notes)
-    return
-  }
-
-  notesList.innerHTML = notes
-    .map(
-      note => `
-        <li class="note">
-          <div>
-            <p class="note__text">${escapeHtml(note.text)}</p>
-            <div class="note__meta">
-              Создано: ${formatDate(note.createdAt)}
-              ${note.updatedAt ? ` • Изменено: ${formatDate(note.updatedAt)}` : ''}
-            </div>
-          </div>
-
-          <div class="note__actions">
-            <button class="edit-btn" type="button" data-action="edit" data-id="${note.id}">
-              Редактировать
-            </button>
-            <button class="delete-btn" type="button" data-action="delete" data-id="${note.id}">
-              Удалить
-            </button>
-          </div>
-        </li>
-      `
-    )
-    .join('')
-
-  updateCounters(notes)
-}
-
-function addNote(text) {
-  const notes = getNotes()
-  notes.unshift({
-    id: crypto.randomUUID(),
-    text,
-    createdAt: Date.now(),
-    updatedAt: null
-  })
-  saveNotes(notes)
-  renderNotes()
-}
-
-function updateNote(id, newText) {
-  const notes = getNotes().map(note =>
-    note.id === id
-      ? { ...note, text: newText, updatedAt: Date.now() }
-      : note
-  )
-
-  saveNotes(notes)
-  renderNotes()
-}
-
-function deleteNote(id) {
-  const notes = getNotes().filter(note => note.id !== id)
-  saveNotes(notes)
-  renderNotes()
-}
-
-function clearAllNotes() {
-  localStorage.removeItem('notes')
-  renderNotes()
-}
-
-function resetForm() {
-  editingId = null
-  form.reset()
-  submitBtn.textContent = 'Добавить'
-  cancelEditBtn.classList.add('hidden')
-  input.focus()
-}
-
-function startEditing(id) {
-  const notes = getNotes()
-  const note = notes.find(item => item.id === id)
-  if (!note) return
-
-  editingId = id
-  input.value = note.text
-  submitBtn.textContent = 'Сохранить'
-  cancelEditBtn.classList.remove('hidden')
-  input.focus()
 }
 
 function updateOnlineStatus() {
@@ -133,56 +71,253 @@ function updateOnlineStatus() {
   networkStatus.classList.toggle('offline', !online)
 }
 
-form.addEventListener('submit', event => {
-  event.preventDefault()
+function showToast(text) {
+  const notification = document.createElement('div')
+  notification.className = 'toast'
+  notification.textContent = text
+  document.body.appendChild(notification)
 
-  const text = input.value.trim()
-  if (!text) return
+  setTimeout(() => {
+    notification.classList.add('toast--hide')
+    setTimeout(() => notification.remove(), 300)
+  }, 2500)
+}
 
-  if (editingId) {
-    updateNote(editingId, text)
-  } else {
-    addNote(text)
+function initNotes() {
+  const form = document.getElementById('note-form')
+  const input = document.getElementById('note-input')
+  const notesList = document.getElementById('notes-list')
+  const notesCount = document.getElementById('notes-count')
+  const emptyState = document.getElementById('empty-state')
+  const submitBtn = document.getElementById('submit-btn')
+  const cancelEditBtn = document.getElementById('cancel-edit-btn')
+  const clearAllBtn = document.getElementById('clear-all-btn')
+
+  function updateCounters(notes) {
+    notesCount.textContent = `Заметок: ${notes.length}`
+    emptyState.classList.toggle('hidden', notes.length !== 0)
   }
 
-  resetForm()
-})
+  function renderNotes() {
+    const notes = getNotes()
 
-cancelEditBtn.addEventListener('click', () => {
-  resetForm()
-})
-
-clearAllBtn.addEventListener('click', () => {
-  if (!getNotes().length) return
-  const ok = window.confirm('Удалить все заметки?')
-  if (!ok) return
-
-  clearAllNotes()
-  resetForm()
-})
-
-notesList.addEventListener('click', event => {
-  const button = event.target.closest('button')
-  if (!button) return
-
-  const { action, id } = button.dataset
-  if (!id) return
-
-  if (action === 'edit') {
-    startEditing(id)
-  }
-
-  if (action === 'delete') {
-    const ok = window.confirm('Удалить заметку?')
-    if (!ok) return
-
-    if (editingId === id) {
-      resetForm()
+    if (notes.length === 0) {
+      notesList.innerHTML = ''
+      updateCounters(notes)
+      return
     }
 
-    deleteNote(id)
+    notesList.innerHTML = notes
+      .map(
+        note => `
+          <li class="note">
+            <div>
+              <p class="note__text">${escapeHtml(note.text)}</p>
+              <div class="note__meta">
+                Создано: ${formatDate(note.createdAt)}
+                ${note.updatedAt ? ` • Изменено: ${formatDate(note.updatedAt)}` : ''}
+              </div>
+            </div>
+
+            <div class="note__actions">
+              <button class="edit-btn" type="button" data-action="edit" data-id="${note.id}">
+                Редактировать
+              </button>
+              <button class="delete-btn" type="button" data-action="delete" data-id="${note.id}">
+                Удалить
+              </button>
+            </div>
+          </li>
+        `
+      )
+      .join('')
+
+    updateCounters(notes)
   }
-})
+
+  function resetForm() {
+    editingId = null
+    form.reset()
+    submitBtn.textContent = 'Добавить'
+    cancelEditBtn.classList.add('hidden')
+    input.focus()
+  }
+
+  function addNote(text) {
+    const notes = getNotes()
+    const newNote = {
+      id: crypto.randomUUID(),
+      text,
+      createdAt: Date.now(),
+      updatedAt: null
+    }
+
+    notes.unshift(newNote)
+    saveNotes(notes)
+    renderNotes()
+
+    if (socket) {
+      socket.emit('newTask', {
+        text,
+        timestamp: Date.now()
+      })
+    }
+  }
+
+  function updateNote(id, newText) {
+    const notes = getNotes().map(note =>
+      note.id === id
+        ? { ...note, text: newText, updatedAt: Date.now() }
+        : note
+    )
+
+    saveNotes(notes)
+    renderNotes()
+  }
+
+  function deleteNote(id) {
+    const notes = getNotes().filter(note => note.id !== id)
+    saveNotes(notes)
+    renderNotes()
+  }
+
+  function clearAllNotes() {
+    localStorage.removeItem('notes')
+    renderNotes()
+  }
+
+  function startEditing(id) {
+    const notes = getNotes()
+    const note = notes.find(item => item.id === id)
+    if (!note) return
+
+    editingId = id
+    input.value = note.text
+    submitBtn.textContent = 'Сохранить'
+    cancelEditBtn.classList.remove('hidden')
+    input.focus()
+  }
+
+  form.addEventListener('submit', event => {
+    event.preventDefault()
+
+    const text = input.value.trim()
+    if (!text) return
+
+    if (editingId) {
+      updateNote(editingId, text)
+    } else {
+      addNote(text)
+    }
+
+    resetForm()
+  })
+
+  cancelEditBtn.addEventListener('click', () => {
+    resetForm()
+  })
+
+  clearAllBtn.addEventListener('click', () => {
+    if (!getNotes().length) return
+    const ok = window.confirm('Удалить все заметки?')
+    if (!ok) return
+
+    clearAllNotes()
+    resetForm()
+  })
+
+  notesList.addEventListener('click', event => {
+    const button = event.target.closest('button')
+    if (!button) return
+
+    const { action, id } = button.dataset
+    if (!id) return
+
+    if (action === 'edit') {
+      startEditing(id)
+    }
+
+    if (action === 'delete') {
+      const ok = window.confirm('Удалить заметку?')
+      if (!ok) return
+
+      if (editingId === id) {
+        resetForm()
+      }
+
+      deleteNote(id)
+    }
+  })
+
+  renderNotes()
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+
+  for (let i = 0; i < rawData.length; i += 1) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+
+  return outputArray
+}
+
+async function getPublicVapidKey() {
+  const response = await fetch('/vapid-public-key')
+  const data = await response.json()
+  return data.publicKey
+}
+
+async function subscribeToPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+
+  try {
+    const publicKey = await getPublicVapidKey()
+    const registration = await navigator.serviceWorker.ready
+
+    const existingSubscription = await registration.pushManager.getSubscription()
+    if (existingSubscription) return existingSubscription
+
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    })
+
+    await fetch('/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(subscription)
+    })
+
+    return subscription
+  } catch (err) {
+    console.error('Ошибка подписки на push:', err)
+    throw err
+  }
+}
+
+async function unsubscribeFromPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+
+  const registration = await navigator.serviceWorker.ready
+  const subscription = await registration.pushManager.getSubscription()
+
+  if (subscription) {
+    await fetch('/unsubscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint })
+    })
+
+    await subscription.unsubscribe()
+  }
+}
 
 window.addEventListener('online', updateOnlineStatus)
 window.addEventListener('offline', updateOnlineStatus)
@@ -195,7 +330,7 @@ window.addEventListener('beforeinstallprompt', event => {
 
 installBtn.addEventListener('click', async () => {
   if (!deferredPrompt) {
-    alert('Кнопка установки пока недоступна. Проверь manifest и service worker.')
+    alert('Кнопка установки пока недоступна.')
     return
   }
 
@@ -207,19 +342,56 @@ installBtn.addEventListener('click', async () => {
 
 window.addEventListener('appinstalled', () => {
   installBtn.classList.add('hidden')
-  console.log('PWA установлено')
 })
 
-renderNotes()
-updateOnlineStatus()
+if (socket) {
+  socket.on('taskAdded', task => {
+    showToast(`Новая задача: ${task.text}`)
+  })
+}
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
-      const registration = await navigator.serviceWorker.register('sw.js')
-      console.log('Service Worker зарегистрирован:', registration.scope)
+      const reg = await navigator.serviceWorker.register('./sw.js')
+      currentRegistration = reg
+      console.log('SW registered:', reg.scope)
+
+      const subscription = await reg.pushManager.getSubscription()
+      if (subscription) {
+        enablePushBtn.classList.add('hidden')
+        disablePushBtn.classList.remove('hidden')
+      }
+
+      enablePushBtn.addEventListener('click', async () => {
+        if (Notification.permission === 'denied') {
+          alert('Уведомления запрещены. Разрешите их в настройках браузера.')
+          return
+        }
+
+        if (Notification.permission === 'default') {
+          const permission = await Notification.requestPermission()
+          if (permission !== 'granted') {
+            alert('Необходимо разрешить уведомления.')
+            return
+          }
+        }
+
+        await subscribeToPush()
+        enablePushBtn.classList.add('hidden')
+        disablePushBtn.classList.remove('hidden')
+      })
+
+      disablePushBtn.addEventListener('click', async () => {
+        await unsubscribeFromPush()
+        disablePushBtn.classList.add('hidden')
+        enablePushBtn.classList.remove('hidden')
+      })
     } catch (err) {
-      console.error('Ошибка регистрации Service Worker:', err)
+      console.error('SW registration failed:', err)
     }
   })
 }
+
+updateOnlineStatus()
+loadContent('home')

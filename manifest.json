@@ -1,13 +1,13 @@
 {
   "id": "./index.html",
-  "name": "Мои заметки",
+  "name": "Заметки",
   "short_name": "Заметки",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#111111",
   "theme_color": "#111111",
-  "description": "Простое приложение для заметок, работающее офлайн",
+  "description": "Приложение заметок с App Shell, WebSocket и Push",
   "orientation": "portrait",
   "icons": [
     {

@@ -1,0 +1,27 @@
+<section class="home-content">
+  <div class="content-head">
+    <h2>Добавить заметку</h2>
+    <p class="muted">Заметки сохраняются локально и доступны офлайн.</p>
+  </div>
+
+  <form id="note-form" class="form">
+    <input id="note-input" type="text" placeholder="Введите заметку..." required />
+    <button id="submit-btn" type="submit">Добавить</button>
+    <button id="cancel-edit-btn" type="button" class="ghost hidden">Отмена</button>
+  </form>
+
+  <div class="toolbar">
+    <div class="toolbar__left">
+      <span id="notes-count">Заметок: 0</span>
+    </div>
+    <button id="clear-all-btn" type="button" class="danger ghost">
+      Очистить всё
+    </button>
+  </div>
+
+  <ul id="notes-list" class="notes-list"></ul>
+
+  <div id="empty-state" class="empty hidden">
+    Пока заметок нет. Добавь первую заметку.
+  </div>
+</section>

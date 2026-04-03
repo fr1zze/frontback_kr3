@@ -53,11 +53,19 @@ h1 {
   line-height: 1.05;
 }
 
+h2 {
+  margin-top: 0;
+}
+
 .subtitle {
   margin: 0;
   color: var(--muted);
   max-width: 620px;
   line-height: 1.5;
+}
+
+.muted {
+  color: var(--muted);
 }
 
 .network {
@@ -80,6 +88,23 @@ h1 {
   color: #d4d4d4;
 }
 
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.tab.active {
+  background: #ffffff;
+  color: #111111;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -87,6 +112,16 @@ h1 {
   box-shadow: var(--shadow);
   padding: 18px;
   backdrop-filter: blur(10px);
+}
+
+.footer-panel {
+  margin-top: 16px;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .form {
@@ -132,11 +167,13 @@ button:hover {
   transform: translateY(-1px);
 }
 
-#submit-btn {
+#submit-btn,
+.install-btn {
   background: var(--primary);
 }
 
-#submit-btn:hover {
+#submit-btn:hover,
+.install-btn:hover {
   background: var(--primary-hover);
 }
 
@@ -237,25 +274,26 @@ button:hover {
   border-radius: 18px;
 }
 
-.install-box {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+.about-card,
+.content-head {
+  margin-bottom: 16px;
 }
 
-.install-btn {
+.toast {
+  position: fixed;
+  top: 14px;
+  right: 14px;
   background: #ffffff;
   color: #111111;
+  padding: 14px 16px;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  z-index: 9999;
+  transition: opacity 0.3s ease;
 }
 
-.install-btn:hover {
-  background: #d4d4d4;
-}
-
-.install-hint {
-  margin: 10px 0 0;
-  color: var(--muted);
-  font-size: 13px;
+.toast--hide {
+  opacity: 0;
 }
 
 .hidden {
@@ -282,5 +320,10 @@ button:hover {
 
   .note__actions {
     justify-content: flex-start;
+  }
+
+  .tabs,
+  .footer-actions {
+    flex-direction: column;
   }
 }
