@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Заметки</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="description" content="Простое приложение для заметок, работающее офлайн" />
+
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./icons/icon-128.png" type="image/png" />
+  <link rel="apple-touch-icon" href="./icons/icon-256.png" />
+
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <link rel="stylesheet" href="./style.css" />
+</head>
+
+<body>
+  <div class="app">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">PWA • Практики 13–14</p>
+        <h1>Заметки</h1>
+      </div>
+      <div id="network-status" class="network online">Вы онлайн</div>
+    </header>
+
+    <main class="panel">
+      <form id="note-form" class="form">
+        <input id="note-input" type="text" placeholder="Введите заметку..." required />
+        <button id="submit-btn" type="submit">Добавить</button>
+        <button id="cancel-edit-btn" type="button" class="ghost hidden">
+          Отмена
+        </button>
+      </form>
+
+      <div class="toolbar">
+        <div class="toolbar__left">
+          <span id="notes-count">Заметок: 0</span>
+        </div>
+        <button id="clear-all-btn" type="button" class="danger ghost">
+          Очистить всё
+        </button>
+      </div>
+
+      <ul id="notes-list" class="notes-list"></ul>
+
+      <div id="empty-state" class="empty hidden">
+        Пока заметок нет. Добавь первую заметку.
+      </div>
+
+      <div class="install-box">
+        <button id="install-btn" class="install-btn hidden" type="button">
+          Установить приложение
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+
+</html>
