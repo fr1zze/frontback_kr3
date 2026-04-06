@@ -1,13 +1,24 @@
 <section class="home-content">
   <div class="content-head">
     <h2>Добавить заметку</h2>
-    <p class="muted">Заметки сохраняются локально и доступны офлайн.</p>
+    <p class="muted">Обычная заметка или заметка с напоминанием.</p>
   </div>
 
   <form id="note-form" class="form">
     <input id="note-input" type="text" placeholder="Введите заметку..." required />
     <button id="submit-btn" type="submit">Добавить</button>
     <button id="cancel-edit-btn" type="button" class="ghost hidden">Отмена</button>
+  </form>
+
+  <form id="reminder-form" class="form form--reminder">
+    <input
+      id="reminder-text"
+      type="text"
+      placeholder="Текст напоминания..."
+      required
+    />
+    <input id="reminder-time" type="datetime-local" required />
+    <button id="reminder-submit-btn" type="submit">Добавить с напоминанием</button>
   </form>
 
   <div class="toolbar">

@@ -10,7 +10,6 @@ const socket = typeof io !== 'undefined' ? io() : null
 
 let editingId = null
 let deferredPrompt = null
-let currentRegistration = null
 
 function setActiveButton(activeId) {
   ;[homeBtn, aboutBtn].forEach(btn => btn.classList.remove('active'))
@@ -86,6 +85,9 @@ function showToast(text) {
 function initNotes() {
   const form = document.getElementById('note-form')
   const input = document.getElementById('note-input')
+  const reminderForm = document.getElementById('reminder-form')
+  const reminderText = document.getElementById('reminder-text')
+  const reminderTime = document.getElementById('reminder-time')
   const notesList = document.getElementById('notes-list')
   const notesCount = document.getElementById('notes-count')
   const emptyState = document.getElementById('empty-state')
@@ -108,15 +110,26 @@ function initNotes() {
     }
 
     notesList.innerHTML = notes
-      .map(
-        note => `
+      .map(note => {
+        let reminderInfo = ''
+        if (note.reminder) {
+          reminderInfo = `
+            <div class="note__reminder">
+              ⏰ Напоминание: ${formatDate(note.reminder)}
+            </div>
+          `
+        }
+
+        return `
           <li class="note">
             <div>
               <p class="note__text">${escapeHtml(note.text)}</p>
               <div class="note__meta">
+                ID: ${note.id}<br>
                 Создано: ${formatDate(note.createdAt)}
                 ${note.updatedAt ? ` • Изменено: ${formatDate(note.updatedAt)}` : ''}
               </div>
+              ${reminderInfo}
             </div>
 
             <div class="note__actions">
@@ -129,7 +142,7 @@ function initNotes() {
             </div>
           </li>
         `
-      )
+      })
       .join('')
 
     updateCounters(notes)
@@ -143,30 +156,42 @@ function initNotes() {
     input.focus()
   }
 
-  function addNote(text) {
+  function addNote(text, reminderTimestamp = null) {
     const notes = getNotes()
+
     const newNote = {
-      id: crypto.randomUUID(),
+      id: Date.now(),
       text,
       createdAt: Date.now(),
-      updatedAt: null
+      updatedAt: null,
+      reminder: reminderTimestamp
     }
 
     notes.unshift(newNote)
     saveNotes(notes)
     renderNotes()
 
-    if (socket) {
-      socket.emit('newTask', {
-        text,
-        timestamp: Date.now()
-      })
+    if (reminderTimestamp) {
+      if (socket) {
+        socket.emit('newReminder', {
+          id: newNote.id,
+          text: text,
+          reminderTime: reminderTimestamp
+        })
+      }
+    } else {
+      if (socket) {
+        socket.emit('newTask', {
+          text,
+          timestamp: Date.now()
+        })
+      }
     }
   }
 
   function updateNote(id, newText) {
     const notes = getNotes().map(note =>
-      note.id === id
+      note.id === Number(id)
         ? { ...note, text: newText, updatedAt: Date.now() }
         : note
     )
@@ -176,7 +201,7 @@ function initNotes() {
   }
 
   function deleteNote(id) {
-    const notes = getNotes().filter(note => note.id !== id)
+    const notes = getNotes().filter(note => note.id !== Number(id))
     saveNotes(notes)
     renderNotes()
   }
@@ -188,10 +213,10 @@ function initNotes() {
 
   function startEditing(id) {
     const notes = getNotes()
-    const note = notes.find(item => item.id === id)
+    const note = notes.find(item => item.id === Number(id))
     if (!note) return
 
-    editingId = id
+    editingId = Number(id)
     input.value = note.text
     submitBtn.textContent = 'Сохранить'
     cancelEditBtn.classList.remove('hidden')
@@ -211,6 +236,27 @@ function initNotes() {
     }
 
     resetForm()
+  })
+
+  reminderForm.addEventListener('submit', event => {
+    event.preventDefault()
+
+    const text = reminderText.value.trim()
+    const datetime = reminderTime.value
+
+    if (!text || !datetime) return
+
+    const timestamp = new Date(datetime).getTime()
+
+    if (timestamp <= Date.now()) {
+      alert('Дата напоминания должна быть в будущем')
+      return
+    }
+
+    addNote(text, timestamp)
+
+    reminderText.value = ''
+    reminderTime.value = ''
   })
 
   cancelEditBtn.addEventListener('click', () => {
@@ -241,7 +287,7 @@ function initNotes() {
       const ok = window.confirm('Удалить заметку?')
       if (!ok) return
 
-      if (editingId === id) {
+      if (editingId === Number(id)) {
         resetForm()
       }
 
@@ -277,29 +323,24 @@ async function getPublicVapidKey() {
 async function subscribeToPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
 
-  try {
-    const publicKey = await getPublicVapidKey()
-    const registration = await navigator.serviceWorker.ready
+  const publicKey = await getPublicVapidKey()
+  const registration = await navigator.serviceWorker.ready
 
-    const existingSubscription = await registration.pushManager.getSubscription()
-    if (existingSubscription) return existingSubscription
+  const existingSubscription = await registration.pushManager.getSubscription()
+  if (existingSubscription) return existingSubscription
 
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey)
-    })
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey)
+  })
 
-    await fetch('/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(subscription)
-    })
+  await fetch('/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subscription)
+  })
 
-    return subscription
-  } catch (err) {
-    console.error('Ошибка подписки на push:', err)
-    throw err
-  }
+  return subscription
 }
 
 async function unsubscribeFromPush() {
@@ -354,7 +395,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
       const reg = await navigator.serviceWorker.register('./sw.js')
-      currentRegistration = reg
       console.log('SW registered:', reg.scope)
 
       const subscription = await reg.pushManager.getSubscription()

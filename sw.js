@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = 'app-shell-v15'
-const DYNAMIC_CACHE_NAME = 'dynamic-content-v2'
+const CACHE_NAME = 'app-shell-v17'
+const DYNAMIC_CACHE_NAME = 'dynamic-content-v3'
 
 const ASSETS = [
   './',
@@ -61,14 +61,32 @@ self.addEventListener('fetch', event => {
   }
 
   event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request)
-    })
+    caches.match(event.request).then(response => response || fetch(event.request))
   )
 })
 
+self.addEventListener('notificationclick', event => {
+  const notification = event.notification
+  const action = event.action
+
+  if (action === 'snooze') {
+    const reminderId = notification.data?.reminderId
+
+    event.waitUntil(
+      fetch(`/snooze?reminderId=${reminderId}`, { method: 'POST' })
+        .then(() => notification.close())
+        .catch(err => {
+          console.error('Snooze failed:', err)
+          notification.close()
+        })
+    )
+  } else {
+    notification.close()
+  }
+})
+
 self.addEventListener('push', event => {
-  let data = { title: 'Новое уведомление', body: '' }
+  let data = { title: 'Новое уведомление', body: '', reminderId: null }
 
   if (event.data) {
     data = event.data.json()
@@ -77,7 +95,14 @@ self.addEventListener('push', event => {
   const options = {
     body: data.body,
     icon: './icons/icon-128.png',
-    badge: './icons/icon-128.png'
+    badge: './icons/icon-128.png',
+    data: { reminderId: data.reminderId }
+  }
+
+  if (data.reminderId) {
+    options.actions = [
+      { action: 'snooze', title: 'Отложить на 5 минут' }
+    ]
   }
 
   event.waitUntil(
